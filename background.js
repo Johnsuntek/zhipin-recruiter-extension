@@ -1,74 +1,62 @@
-// background.js — Service Worker
-// 职责：LLM API 调用 + chrome.storage 数据管理
+// ============================================================
+// BOSS直聘开发岗位筛选助手 - Background Service Worker
+// 职责: 存储管理、AI调用、预约状态机、消息路由
+// ============================================================
 
 const STORAGE_KEYS = {
+  SETTINGS: 'settings',
   JOBS: 'savedJobs',
   CANDIDATES: 'candidates',
   SCHEDULES: 'schedules',
-  SETTINGS: 'settings',
   DAILY_STATS: 'dailyStats'
 };
 
-// ========== 默认设置 ==========
 const DEFAULT_SETTINGS = {
   llmProvider: 'openai',
   apiKey: '',
   apiBaseUrl: 'https://api.openai.com/v1',
-  model: 'gpt-4o',
-  maxTokensPerRequest: 2000,
-  dailyRequestLimit: 200,
-  hrbpName: 'HR',
+  model: 'gpt-4o-mini',
+  maxTokensPerRequest: 4000,
+  hrbpName: '',
   companyName: '',
   templates: {
-    reject: '感谢您的关注！您的简历已收录到我们的人才数据库中，我们会持续评估合适的机会。如有匹配的岗位，会第一时间与您联系，请保持关注。'
+    rejection: '感谢您的关注！您的简历已收录到我们的人才数据库中，我们会持续评估合适的机会。如有匹配的岗位，会第一时间与您联系，请保持关注。',
+    greeting: '您好！我是{company}的{hrbpName}，很高兴在BOSS直聘上看到您的简历。我们正在招聘{jobTitle}岗位，觉得您的背景很匹配。想和您做个简短的电话沟通，了解一下您的情况和期望。\n\n请问您这几个时间段方便接听电话吗？\n{timeSlots}\n\n期待您的回复！'
+  },
+  safetyConfig: {
+    minReplyDelaySec: 30,
+    maxReplyDelaySec: 120,
+    maxDailyMessages: 50,
+    timeoutHours: 48
   }
 };
 
-// ========== 存储操作 ==========
-async function getStorage(keys) {
-  return new Promise(resolve => {
-    chrome.storage.local.get(keys, resolve);
-  });
+// ========== 存储工具 ==========
+async function getStore(key) {
+  const result = await chrome.storage.local.get(key);
+  return result[key] || (key === STORAGE_KEYS.SETTINGS ? { ...DEFAULT_SETTINGS } : {});
 }
 
-async function setStorage(data) {
-  return new Promise(resolve => {
-    chrome.storage.local.set(data, resolve);
-  });
+async function setStore(key, value) {
+  await chrome.storage.local.set({ [key]: value });
 }
 
 async function getSettings() {
-  const { settings } = await getStorage([STORAGE_KEYS.SETTINGS]);
-  return { ...DEFAULT_SETTINGS, ...settings };
+  const saved = await getStore(STORAGE_KEYS.SETTINGS);
+  return {
+    ...DEFAULT_SETTINGS,
+    ...saved,
+    templates: { ...DEFAULT_SETTINGS.templates, ...(saved.templates || {}) },
+    safetyConfig: { ...DEFAULT_SETTINGS.safetyConfig, ...(saved.safetyConfig || {}) }
+  };
 }
 
-async function getSavedJobs() {
-  const { savedJobs } = await getStorage([STORAGE_KEYS.JOBS]);
-  return savedJobs || {};
-}
-
-async function getCandidates() {
-  const { candidates } = await getStorage([STORAGE_KEYS.CANDIDATES]);
-  return candidates || {};
-}
-
-// ========== LLM API 调用 ==========
-async function callLLM(prompt, systemPrompt) {
+// ========== LLM 调用 ==========
+async function callLLM(systemPrompt, userPrompt) {
   const settings = await getSettings();
+  if (!settings.apiKey) throw new Error('请先在设置页面配置 API Key');
 
-  if (!settings.apiKey) {
-    throw new Error('请先在设置页面配置 API Key');
-  }
-
-  const url = `${settings.apiBaseUrl}/chat/completions`;
-
-  const messages = [];
-  if (systemPrompt) {
-    messages.push({ role: 'system', content: systemPrompt });
-  }
-  messages.push({ role: 'user', content: prompt });
-
-  const response = await fetch(url, {
+  const resp = await fetch(`${settings.apiBaseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -76,240 +64,295 @@ async function callLLM(prompt, systemPrompt) {
     },
     body: JSON.stringify({
       model: settings.model,
-      messages,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
       max_tokens: settings.maxTokensPerRequest,
       temperature: 0.3
     })
   });
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`LLM API 错误 (${response.status}): ${errText}`);
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`LLM API 错误 (${resp.status}): ${err}`);
   }
 
-  const data = await response.json();
-  return data.choices[0].message.content;
+  const data = await resp.json();
+  return data.choices[0].message.content.trim();
 }
 
-// 解析 LLM 返回的 JSON（容错处理）
-function parseLLMJson(text) {
-  // 尝试提取 JSON 块
-  const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) ||
-                    text.match(/```\s*([\s\S]*?)```/) ||
-                    text.match(/(\{[\s\S]*\})/);
+function parseJSON(text) {
+  try { return JSON.parse(text); } catch {}
+  const m = text.match(/```(?:json)?\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/);
+  if (m) { try { return JSON.parse(m[1].trim()); } catch {} }
+  throw new Error('无法解析 LLM 返回的 JSON');
+}
 
-  if (jsonMatch) {
-    try {
-      return JSON.parse(jsonMatch[1].trim());
-    } catch (e) {
-      console.error('[筛选助手] JSON 解析失败:', e, jsonMatch[1]);
+// ========== AI 功能 ==========
+
+// 提取 JD 评估维度
+async function extractJDDimensions(jdText, jobTitle) {
+  const result = await callLLM(
+    '你是专业技术招聘顾问。从开发岗位JD中提取结构化评估维度。只返回JSON。',
+    `职位: ${jobTitle}\nJD:\n${jdText}\n\n返回JSON:\n{\n  "techStack": ["必须技术栈"],\n  "experienceYears": "年限要求",\n  "education": "学历要求",\n  "projectKeywords": ["关键项目经验词"],\n  "bonusItems": ["加分项"],\n  "hardRequirements": ["硬性门槛"],\n  "isDevRole": true,\n  "summary": "一句话核心要求"\n}`
+  );
+  return parseJSON(result);
+}
+
+// 评估候选人
+async function evaluateCandidate(resumeText, dimensions, jobTitle) {
+  const result = await callLLM(
+    '你是专业技术招聘评估专家。根据JD评估维度对候选人简历逐项评估。只返回JSON。',
+    `## 职位: ${jobTitle}\n## JD维度:\n${JSON.stringify(dimensions, null, 2)}\n\n## 候选人简历:\n${resumeText}\n\n返回JSON:\n{\n  "score": 85,\n  "recommendation": "qualified/unqualified/pending",\n  "analysis": {\n    "techStack": {"score": 20, "max": 25, "match": "高/中/低", "detail": "分析"},\n    "experience": {"score": 18, "max": 20, "match": "高/中/低", "detail": "分析"},\n    "education": {"score": 10, "max": 10, "match": "高/中/低", "detail": "分析"},\n    "projectRelevance": {"score": 20, "max": 25, "match": "高/中/低", "detail": "分析"},\n    "bonus": {"score": 8, "max": 10, "detail": "分析"},\n    "hardRequirements": {"pass": true, "detail": "分析"}\n  },\n  "conclusion": "简要评估结论",\n  "highlights": ["亮点"],\n  "risks": ["风险"]\n}`
+  );
+  return parseJSON(result);
+}
+
+// 生成聊天回复（预约协商用）
+async function generateChatReply(context) {
+  return await callLLM(
+    '你是HR助手，正在BOSS直聘上代替HRBP与候选人沟通预约电话时间。回复要自然、礼貌、简洁，像真人聊天。只返回回复文本。',
+    `HRBP: ${context.hrbpName}\n公司: ${context.company}\n职位: ${context.jobTitle}\n可用时间: ${context.timeSlots}\n\n当前状态: ${context.status}\n对话历史:\n${context.chatHistory}\n\n候选人最新消息:\n${context.lastMessage}\n\n生成回复。如候选人提了时间，判断是否匹配HRBP可用时间，匹配则确认，不匹配则建议其他时间。`
+  );
+}
+
+// 解析候选人回复中的时间意图
+async function parseTimeIntent(message, availableSlots) {
+  const result = await callLLM(
+    '分析候选人回复，判断是否提到具体时间以及是否与可用时间匹配。只返回JSON。',
+    `可用时间段: ${JSON.stringify(availableSlots)}\n候选人回复: "${message}"\n\n返回JSON:\n{\n  "hasTimeInfo": true,\n  "proposedTime": "候选人提的时间",\n  "matchesAvailable": true,\n  "confirmedSlot": "匹配的时间段",\n  "needsNegotiation": false\n}`
+  );
+  return parseJSON(result);
+}
+
+// ========== 预约管理 ==========
+async function createSchedule(candidateId, timeSlots) {
+  const schedules = await getStore(STORAGE_KEYS.SCHEDULES);
+  const schedule = {
+    id: `sch_${Date.now()}`,
+    candidateId,
+    hrbpTimeSlots: timeSlots,
+    confirmedTime: null,
+    status: 'pending',
+    chatLog: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  schedules[schedule.id] = schedule;
+  await setStore(STORAGE_KEYS.SCHEDULES, schedules);
+
+  const candidates = await getStore(STORAGE_KEYS.CANDIDATES);
+  if (candidates[candidateId]) {
+    candidates[candidateId].status = 'scheduling';
+    candidates[candidateId].scheduleId = schedule.id;
+    await setStore(STORAGE_KEYS.CANDIDATES, candidates);
+  }
+  return schedule;
+}
+
+async function updateSchedule(scheduleId, status, extra = {}) {
+  const schedules = await getStore(STORAGE_KEYS.SCHEDULES);
+  if (!schedules[scheduleId]) return null;
+  Object.assign(schedules[scheduleId], { status, updatedAt: new Date().toISOString(), ...extra });
+  await setStore(STORAGE_KEYS.SCHEDULES, schedules);
+
+  const candidates = await getStore(STORAGE_KEYS.CANDIDATES);
+  const cid = schedules[scheduleId].candidateId;
+  if (candidates[cid]) {
+    candidates[cid].status = status === 'confirmed' ? 'scheduled' : status === 'timeout' ? 'timeout' : 'scheduling';
+    await setStore(STORAGE_KEYS.CANDIDATES, candidates);
+  }
+  return schedules[scheduleId];
+}
+
+async function addChatLog(scheduleId, role, message) {
+  const schedules = await getStore(STORAGE_KEYS.SCHEDULES);
+  if (!schedules[scheduleId]) return;
+  schedules[scheduleId].chatLog.push({ role, message, timestamp: new Date().toISOString() });
+  schedules[scheduleId].updatedAt = new Date().toISOString();
+  await setStore(STORAGE_KEYS.SCHEDULES, schedules);
+}
+
+// ========== 每日限额 ==========
+async function checkDailyLimit() {
+  const settings = await getSettings();
+  const stats = await getStore(STORAGE_KEYS.DAILY_STATS);
+  const today = new Date().toISOString().split('T')[0];
+  return (stats[today] || 0) < settings.safetyConfig.maxDailyMessages;
+}
+
+async function incrementDailyCount() {
+  const stats = await getStore(STORAGE_KEYS.DAILY_STATS);
+  const today = new Date().toISOString().split('T')[0];
+  stats[today] = (stats[today] || 0) + 1;
+  await setStore(STORAGE_KEYS.DAILY_STATS, stats);
+}
+
+// ========== 超时检查 ==========
+chrome.alarms.create('checkTimeouts', { periodInMinutes: 30 });
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name !== 'checkTimeouts') return;
+  const settings = await getSettings();
+  const schedules = await getStore(STORAGE_KEYS.SCHEDULES);
+  const now = Date.now();
+  for (const [id, s] of Object.entries(schedules)) {
+    if (s.status !== 'pending' && s.status !== 'negotiating') continue;
+    if ((now - new Date(s.updatedAt).getTime()) / 3600000 > settings.safetyConfig.timeoutHours) {
+      await updateSchedule(id, 'timeout');
     }
   }
-
-  // 直接尝试解析
-  try {
-    return JSON.parse(text.trim());
-  } catch (e) {
-    console.error('[筛选助手] 无法解析 LLM 返回:', text);
-    return null;
-  }
-}
-
-// ========== 消息处理 ==========
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  (async () => {
-    try {
-      switch (message.type) {
-
-        // ---- 设置 ----
-        case 'GET_SETTINGS': {
-          const settings = await getSettings();
-          sendResponse({ ok: true, settings });
-          break;
-        }
-
-        case 'SAVE_SETTINGS': {
-          await setStorage({ [STORAGE_KEYS.SETTINGS]: message.settings });
-          sendResponse({ ok: true });
-          break;
-        }
-
-        // ---- 职位 JD ----
-        case 'SAVE_JOB': {
-          const jobs = await getSavedJobs();
-          const job = message.job;
-          const now = new Date().toISOString();
-          jobs[job.jobId] = {
-            ...jobs[job.jobId],
-            ...job,
-            savedAt: now
-          };
-          await setStorage({ [STORAGE_KEYS.JOBS]: jobs });
-          sendResponse({ ok: true });
-          break;
-        }
-
-        case 'GET_JOBS': {
-          const jobs = await getSavedJobs();
-          sendResponse({ ok: true, jobs });
-          break;
-        }
-
-        case 'DELETE_JOB': {
-          const jobs = await getSavedJobs();
-          delete jobs[message.jobId];
-          await setStorage({ [STORAGE_KEYS.JOBS]: jobs });
-          sendResponse({ ok: true });
-          break;
-        }
-
-        // ---- LLM: 提取 JD 维度 ----
-        case 'EXTRACT_JD_DIMENSIONS': {
-          const prompt = `从以下职位描述中提取关键评估维度，返回 JSON 格式：
-{
-  "techStack": ["技术1", "技术2"],
-  "expYears": "X-Y年",
-  "education": "本科/硕士/学历不限",
-  "keyRequirements": ["关键要求1", "关键要求2"],
-  "bonusPoints": ["加分项1", "加分项2"],
-  "hardRequirements": ["硬性门槛1"],
-  "salary": "薪资范围",
-  "isDevRole": true
-}
-
-注意：
-- techStack 只列出明确提到的技术栈（编程语言、框架、工具、中间件等）
-- isDevRole 判断是否为开发相关岗位（前端/后端/全栈/移动端/测试开发/DevOps/架构师等）
-- 如果某项信息JD中没有明确提到，填空数组或空字符串
-
-职位名称：${message.jobTitle}
-职位描述：
-${message.jdText}`;
-
-          const result = await callLLM(prompt);
-          const dimensions = parseLLMJson(result);
-          sendResponse({ ok: true, dimensions });
-          break;
-        }
-
-        // ---- LLM: 评估候选人 ----
-        case 'EVALUATE_CANDIDATE': {
-          const { candidateInfo, jobInfo } = message;
-          const dims = jobInfo.dimensions || {};
-
-          const prompt = `你是一名专业的技术招聘评估专家。请将以下候选人简历与职位要求进行逐项对比评估。
-
-## 职位要求
-- 职位：${jobInfo.title}
-- 技术栈要求：${(dims.techStack || []).join(', ') || '未指定'}
-- 经验要求：${dims.expYears || '未指定'}
-- 学历要求：${dims.education || '未指定'}
-- 关键要求：${(dims.keyRequirements || []).join(', ') || '未指定'}
-- 加分项：${(dims.bonusPoints || []).join(', ') || '无'}
-- 硬性门槛：${(dims.hardRequirements || []).join(', ') || '无'}
-- 薪资范围：${dims.salary || jobInfo.salary || '未指定'}
-
-## 候选人信息
-${candidateInfo}
-
-## 请严格按以下 JSON 格式返回（不要加其他文字）：
-{
-  "score": 85,
-  "verdict": "推荐面试",
-  "analysis": {
-    "techStack": { "score": 18, "max": 25, "detail": "说明" },
-    "experience": { "score": 18, "max": 20, "detail": "说明" },
-    "education": { "score": 10, "max": 10, "detail": "说明" },
-    "projectRelevance": { "score": 20, "max": 25, "detail": "说明" },
-    "bonus": { "score": 8, "max": 10, "detail": "说明" },
-    "hardRequirements": { "pass": true, "detail": "说明" }
-  },
-  "summary": "一段话总结评估结论和建议",
-  "risks": ["风险1", "风险2"],
-  "highlights": ["亮点1", "亮点2"]
-}
-
-评分标准：
-- 80-100：强烈推荐/推荐面试
-- 60-79：可以考虑
-- 0-59：不太匹配/明显不符`;
-
-          const result = await callLLM(prompt);
-          const evaluation = parseLLMJson(result);
-
-          if (evaluation) {
-            // 保存评估结果到候选人数据
-            const candidates = await getCandidates();
-            const candidateId = message.candidateId;
-            candidates[candidateId] = {
-              ...candidates[candidateId],
-              score: evaluation.score,
-              verdict: evaluation.verdict,
-              evaluation,
-              evaluatedAt: new Date().toISOString(),
-              jobId: jobInfo.jobId,
-              status: evaluation.score >= 80 ? 'qualified' :
-                      evaluation.score >= 60 ? 'pending' : 'unqualified'
-            };
-            await setStorage({ [STORAGE_KEYS.CANDIDATES]: candidates });
-          }
-
-          sendResponse({ ok: true, evaluation });
-          break;
-        }
-
-        // ---- 候选人管理 ----
-        case 'UPDATE_CANDIDATE': {
-          const candidates = await getCandidates();
-          const now = new Date().toISOString();
-          const id = message.candidate.candidateId;
-          candidates[id] = {
-            ...candidates[id],
-            ...message.candidate,
-            updatedAt: now
-          };
-          await setStorage({ [STORAGE_KEYS.CANDIDATES]: candidates });
-          sendResponse({ ok: true });
-          break;
-        }
-
-        case 'UPDATE_CANDIDATE_STATUS': {
-          const candidates = await getCandidates();
-          const { candidateId, status } = message;
-          if (candidates[candidateId]) {
-            candidates[candidateId].status = status;
-            candidates[candidateId].updatedAt = new Date().toISOString();
-            await setStorage({ [STORAGE_KEYS.CANDIDATES]: candidates });
-          }
-          sendResponse({ ok: true });
-          break;
-        }
-
-        case 'GET_ALL_DATA': {
-          const [jobsData, candidatesData, settingsData] = await Promise.all([
-            getSavedJobs(),
-            getCandidates(),
-            getSettings()
-          ]);
-          sendResponse({
-            ok: true,
-            data: {
-              jobs: jobsData,
-              candidates: candidatesData,
-              settings: settingsData
-            }
-          });
-          break;
-        }
-
-        default:
-          sendResponse({ ok: false, error: '未知消息类型: ' + message.type });
-      }
-    } catch (err) {
-      console.error('[筛选助手] background 错误:', err);
-      sendResponse({ ok: false, error: err.message });
-    }
-  })();
-
-  return true; // 异步响应
 });
+
+// ========== 消息路由 ==========
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  handleMessage(msg).then(sendResponse).catch(e => sendResponse({ ok: false, error: e.message }));
+  return true;
+});
+
+async function handleMessage(msg) {
+  switch (msg.type) {
+    case 'GET_SETTINGS':
+      return { ok: true, settings: await getSettings() };
+
+    case 'SAVE_SETTINGS':
+      await setStore(STORAGE_KEYS.SETTINGS, msg.settings);
+      return { ok: true };
+
+    case 'SAVE_JOB': {
+      const jobs = await getStore(STORAGE_KEYS.JOBS);
+      const dimensions = await extractJDDimensions(msg.job.jdText, msg.job.title);
+      jobs[msg.job.jobId] = { ...msg.job, dimensions, savedAt: new Date().toISOString() };
+      await setStore(STORAGE_KEYS.JOBS, jobs);
+      return { ok: true, dimensions };
+    }
+
+    case 'GET_JOBS':
+      return { ok: true, jobs: await getStore(STORAGE_KEYS.JOBS) };
+
+    case 'DELETE_JOB': {
+      const jobs = await getStore(STORAGE_KEYS.JOBS);
+      delete jobs[msg.jobId];
+      await setStore(STORAGE_KEYS.JOBS, jobs);
+      return { ok: true };
+    }
+
+    case 'EXTRACT_JD_DIMENSIONS': {
+      const dimensions = await extractJDDimensions(msg.jdText, msg.jobTitle);
+      return { ok: true, dimensions };
+    }
+
+    case 'EVALUATE_CANDIDATE': {
+      const jobs = await getStore(STORAGE_KEYS.JOBS);
+      const job = jobs[msg.jobId];
+      if (!job) return { ok: false, error: '未找到关联的职位JD' };
+      const evaluation = await evaluateCandidate(msg.resumeText, job.dimensions, job.title);
+      const candidates = await getStore(STORAGE_KEYS.CANDIDATES);
+      candidates[msg.candidateId] = {
+        ...(candidates[msg.candidateId] || {}),
+        ...msg.candidateInfo,
+        candidateId: msg.candidateId,
+        jobId: msg.jobId,
+        jobTitle: job.title,
+        evaluation,
+        score: evaluation.score,
+        status: evaluation.recommendation || (evaluation.score >= 80 ? 'qualified' : evaluation.score >= 60 ? 'pending' : 'unqualified'),
+        evaluatedAt: new Date().toISOString()
+      };
+      await setStore(STORAGE_KEYS.CANDIDATES, candidates);
+      return { ok: true, evaluation };
+    }
+
+    case 'UPDATE_CANDIDATE_STATUS': {
+      const candidates = await getStore(STORAGE_KEYS.CANDIDATES);
+      if (candidates[msg.candidateId]) {
+        candidates[msg.candidateId].status = msg.status;
+        candidates[msg.candidateId].updatedAt = new Date().toISOString();
+        await setStore(STORAGE_KEYS.CANDIDATES, candidates);
+      }
+      return { ok: true };
+    }
+
+    case 'UPDATE_CANDIDATE': {
+      const candidates = await getStore(STORAGE_KEYS.CANDIDATES);
+      const id = msg.candidate.candidateId;
+      candidates[id] = { ...candidates[id], ...msg.candidate, updatedAt: new Date().toISOString() };
+      await setStore(STORAGE_KEYS.CANDIDATES, candidates);
+      return { ok: true };
+    }
+
+    case 'CREATE_SCHEDULE': {
+      const schedule = await createSchedule(msg.candidateId, msg.timeSlots);
+      return { ok: true, schedule };
+    }
+
+    case 'GENERATE_GREETING': {
+      const settings = await getSettings();
+      const candidates = await getStore(STORAGE_KEYS.CANDIDATES);
+      const c = candidates[msg.candidateId];
+      if (!c) return { ok: false, error: '候选人未找到' };
+      const text = settings.templates.greeting
+        .replace('{company}', settings.companyName || '我们公司')
+        .replace('{hrbpName}', settings.hrbpName || 'HR')
+        .replace('{jobTitle}', c.jobTitle || '开发工程师')
+        .replace('{timeSlots}', msg.timeSlots.join('\n'));
+      return { ok: true, message: text };
+    }
+
+    case 'GENERATE_CHAT_REPLY': {
+      if (!(await checkDailyLimit())) return { ok: false, error: '已达今日消息上限' };
+      const settings = await getSettings();
+      const reply = await generateChatReply({
+        hrbpName: settings.hrbpName || 'HR',
+        company: settings.companyName || '我们公司',
+        jobTitle: msg.jobTitle,
+        timeSlots: msg.timeSlots,
+        status: msg.status,
+        chatHistory: msg.chatHistory,
+        lastMessage: msg.lastMessage
+      });
+      return { ok: true, reply };
+    }
+
+    case 'PARSE_TIME_INTENT': {
+      const intent = await parseTimeIntent(msg.message, msg.availableSlots);
+      return { ok: true, intent };
+    }
+
+    case 'UPDATE_SCHEDULE': {
+      const schedule = await updateSchedule(msg.scheduleId, msg.status, msg.extra || {});
+      return { ok: true, schedule };
+    }
+
+    case 'ADD_CHAT_LOG': {
+      await addChatLog(msg.scheduleId, msg.role, msg.message);
+      await incrementDailyCount();
+      return { ok: true };
+    }
+
+    case 'GET_REJECTION_MESSAGE': {
+      const settings = await getSettings();
+      return { ok: true, message: settings.templates.rejection };
+    }
+
+    case 'GET_ALL_DATA':
+      return {
+        ok: true,
+        data: {
+          jobs: await getStore(STORAGE_KEYS.JOBS),
+          candidates: await getStore(STORAGE_KEYS.CANDIDATES),
+          schedules: await getStore(STORAGE_KEYS.SCHEDULES),
+          settings: await getSettings()
+        }
+      };
+
+    case 'CLEAR_DATA': {
+      const targets = { all: ['JOBS','CANDIDATES','SCHEDULES','DAILY_STATS'], candidates: ['CANDIDATES','SCHEDULES'], jobs: ['JOBS'] };
+      for (const k of (targets[msg.dataType] || [])) await setStore(STORAGE_KEYS[k], {});
+      return { ok: true };
+    }
+
+    default:
+      return { ok: false, error: '未知消息类型: ' + msg.type };
+  }
+}

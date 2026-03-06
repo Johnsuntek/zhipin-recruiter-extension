@@ -6,137 +6,321 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
-      width: 360px;
-      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      width: 400px;
+      min-height: 500px;
+      padding: 0;
       color: #333;
+      background: #f7f8fa;
     }
+
+    /* Header */
     .header {
+      background: linear-gradient(135deg, #00A6A7, #00878a);
+      color: white;
+      padding: 16px 20px;
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 16px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #f0f0f0;
+      gap: 10px;
     }
-    .header .logo { font-size: 24px; }
-    .header .title { font-size: 16px; font-weight: 700; }
-    .header .version { font-size: 11px; color: #ccc; margin-left: auto; }
+    .header .title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .header .version {
+      font-size: 11px;
+      opacity: 0.7;
+      margin-left: auto;
+      background: rgba(255,255,255,0.15);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
 
+    /* Stats */
     .stats {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      margin-bottom: 16px;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0;
+      background: white;
+      border-bottom: 1px solid #eee;
     }
     .stat {
       text-align: center;
-      padding: 10px 4px;
-      border-radius: 8px;
-      background: #fafafa;
+      padding: 14px 4px 12px;
+      position: relative;
     }
-    .stat .num { font-size: 20px; font-weight: 700; }
-    .stat .lbl { font-size: 11px; color: #999; margin-top: 2px; }
-    .stat.s1 .num { color: #1677ff; }
-    .stat.s2 .num { color: #52c41a; }
-    .stat.s3 .num { color: #faad14; }
-    .stat.s4 .num { color: #f5222d; }
+    .stat:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 20%;
+      height: 60%;
+      width: 1px;
+      background: #f0f0f0;
+    }
+    .stat .num {
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .stat .lbl {
+      font-size: 11px;
+      color: #999;
+      margin-top: 4px;
+    }
+    .stat.total .num { color: #333; }
+    .stat.qualified .num { color: #52c41a; }
+    .stat.pending .num { color: #faad14; }
+    .stat.unqualified .num { color: #f5222d; }
+    .stat.scheduled .num { color: #1677ff; }
 
-    .job-list { margin-bottom: 16px; }
-    .job-list h3 { font-size: 13px; color: #666; margin-bottom: 8px; }
+    /* Content area */
+    .content {
+      padding: 12px 16px 16px;
+    }
+
+    /* Section card */
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #666;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-title .count {
+      font-size: 11px;
+      color: #999;
+      font-weight: 400;
+    }
+
+    /* Schedule items */
+    .schedule-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #f5f5f5;
+      font-size: 13px;
+    }
+    .schedule-item:last-child { border-bottom: none; }
+    .schedule-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .schedule-name {
+      font-weight: 600;
+      color: #333;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .schedule-job {
+      font-size: 11px;
+      color: #999;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .schedule-time {
+      text-align: right;
+      flex-shrink: 0;
+      margin-left: 12px;
+    }
+    .schedule-time .time {
+      font-size: 12px;
+      color: #1677ff;
+      font-weight: 500;
+    }
+    .schedule-time .countdown {
+      font-size: 10px;
+      color: #999;
+      margin-top: 2px;
+    }
+
+    /* Job items */
     .job-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 6px 0;
+      padding: 7px 0;
       border-bottom: 1px solid #f5f5f5;
       font-size: 13px;
     }
-    .job-item .name { font-weight: 500; }
-    .job-item .badge {
+    .job-item:last-child { border-bottom: none; }
+    .job-name {
+      font-weight: 500;
+      color: #333;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-right: 10px;
+    }
+    .job-badge {
       font-size: 11px;
-      padding: 2px 6px;
-      border-radius: 4px;
+      padding: 2px 8px;
+      border-radius: 10px;
       background: #e6fffb;
       color: #00A6A7;
+      flex-shrink: 0;
+      white-space: nowrap;
     }
 
-    .actions {
+    /* Recent evaluation items */
+    .eval-item {
       display: flex;
-      gap: 8px;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid #f8f8f8;
+      font-size: 12px;
     }
-    .actions button {
+    .eval-item:last-child { border-bottom: none; }
+    .eval-info {
       flex: 1;
-      padding: 8px;
+      min-width: 0;
+      color: #555;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .eval-score {
+      font-weight: 700;
+      margin-left: 10px;
+      flex-shrink: 0;
+    }
+    .eval-status {
+      font-size: 11px;
+      padding: 1px 6px;
+      border-radius: 8px;
+      margin-left: 8px;
+      flex-shrink: 0;
+    }
+    .score-green { color: #52c41a; }
+    .score-orange { color: #faad14; }
+    .score-red { color: #f5222d; }
+    .status-qualified { background: #f6ffed; color: #52c41a; }
+    .status-pending { background: #fff7e6; color: #faad14; }
+    .status-unqualified { background: #fff1f0; color: #f5222d; }
+    .status-scheduled { background: #e6f4ff; color: #1677ff; }
+
+    /* Empty state */
+    .empty {
+      text-align: center;
+      padding: 16px 10px;
+      color: #ccc;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    /* Footer buttons */
+    .footer {
+      padding: 0 16px 16px;
+      display: flex;
+      gap: 10px;
+    }
+    .footer button {
+      flex: 1;
+      padding: 10px 8px;
       border: 1px solid #d9d9d9;
       border-radius: 8px;
       background: white;
-      font-size: 12px;
+      font-size: 13px;
       cursor: pointer;
       transition: all 0.2s;
+      font-family: inherit;
     }
-    .actions button:hover {
+    .footer button:hover {
       border-color: #00A6A7;
       color: #00A6A7;
     }
-    .actions .primary {
+    .footer .primary {
       background: #00A6A7;
       color: white;
       border-color: #00A6A7;
+      font-weight: 600;
     }
-    .actions .primary:hover {
+    .footer .primary:hover {
       background: #008f90;
+      border-color: #008f90;
     }
-
-    .empty {
-      text-align: center;
-      padding: 20px;
-      color: #ccc;
-      font-size: 13px;
-    }
-
-    .recent { margin-top: 12px; }
-    .recent h3 { font-size: 13px; color: #666; margin-bottom: 8px; }
-    .recent-item {
-      display: flex;
-      justify-content: space-between;
-      padding: 4px 0;
-      font-size: 12px;
-      border-bottom: 1px solid #f8f8f8;
-    }
-    .recent-item .score { font-weight: 600; }
-    .recent-item .score.green { color: #52c41a; }
-    .recent-item .score.orange { color: #faad14; }
-    .recent-item .score.red { color: #f5222d; }
   </style>
 </head>
 <body>
+  <!-- Header -->
   <div class="header">
-    <span class="logo">🦐</span>
     <span class="title">开发岗位筛选助手</span>
-    <span class="version">v0.3.0</span>
+    <span class="version">v1.0.0</span>
   </div>
 
-  <div class="stats" id="stats">
-    <div class="stat s1"><div class="num" id="statTotal">-</div><div class="lbl">总数</div></div>
-    <div class="stat s2"><div class="num" id="statQualified">-</div><div class="lbl">合格</div></div>
-    <div class="stat s3"><div class="num" id="statPending">-</div><div class="lbl">待定</div></div>
-    <div class="stat s4"><div class="num" id="statUnqualified">-</div><div class="lbl">不合格</div></div>
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat total">
+      <div class="num" id="statTotal">0</div>
+      <div class="lbl">总计</div>
+    </div>
+    <div class="stat qualified">
+      <div class="num" id="statQualified">0</div>
+      <div class="lbl">合格</div>
+    </div>
+    <div class="stat pending">
+      <div class="num" id="statPending">0</div>
+      <div class="lbl">待定</div>
+    </div>
+    <div class="stat unqualified">
+      <div class="num" id="statUnqualified">0</div>
+      <div class="lbl">不合格</div>
+    </div>
+    <div class="stat scheduled">
+      <div class="num" id="statScheduled">0</div>
+      <div class="lbl">已预约</div>
+    </div>
   </div>
 
-  <div class="job-list" id="jobList">
-    <h3>📋 已保存的职位 JD</h3>
-    <div id="jobListContent" class="empty">暂无已保存的职位</div>
+  <!-- Content -->
+  <div class="content">
+    <!-- Upcoming schedules -->
+    <div class="card" id="scheduleCard" style="display:none;">
+      <div class="card-title">
+        <span>即将到来的电话沟通</span>
+        <span class="count" id="scheduleCount"></span>
+      </div>
+      <div id="scheduleList"></div>
+    </div>
+
+    <!-- Saved jobs -->
+    <div class="card">
+      <div class="card-title">
+        <span>已保存的职位</span>
+        <span class="count" id="jobCount"></span>
+      </div>
+      <div id="jobListContent">
+        <div class="empty">暂无已保存的职位<br>请在 BOSS 直聘职位页面保存 JD</div>
+      </div>
+    </div>
+
+    <!-- Recent evaluations -->
+    <div class="card" id="recentCard" style="display:none;">
+      <div class="card-title">
+        <span>最近评估</span>
+      </div>
+      <div id="recentList"></div>
+    </div>
   </div>
 
-  <div class="recent" id="recentSection" style="display:none;">
-    <h3>🕐 最近评估</h3>
-    <div id="recentList"></div>
-  </div>
-
-  <div class="actions">
-    <button id="settingsBtn">⚙️ 设置</button>
-    <button class="primary" id="openBossBtn">📖 打开 BOSS 直聘</button>
+  <!-- Footer -->
+  <div class="footer">
+    <button id="settingsBtn">设置</button>
+    <button class="primary" id="openBossBtn">打开 BOSS 直聘</button>
   </div>
 
   <script src="popup.js"></script>

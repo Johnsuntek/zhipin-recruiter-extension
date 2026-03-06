@@ -6,200 +6,342 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
-      background: #f5f5f5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f5f6f8;
       color: #333;
-      padding: 20px;
+      padding: 32px 20px;
       max-width: 700px;
       margin: 0 auto;
     }
-    h1 {
+
+    /* Page title */
+    .page-title {
       font-size: 22px;
-      margin-bottom: 24px;
+      font-weight: 700;
+      margin-bottom: 28px;
+      color: #1a1a1a;
       display: flex;
       align-items: center;
       gap: 8px;
     }
+    .page-title .accent {
+      color: #00A6A7;
+    }
+
+    /* Section cards */
     .section {
       background: white;
       border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 16px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
     }
-    .section h2 {
+    .section-title {
       font-size: 16px;
-      margin-bottom: 16px;
-      padding-bottom: 8px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
       border-bottom: 1px solid #f0f0f0;
+      color: #333;
     }
-    label {
+
+    /* Form elements */
+    .form-group {
+      margin-bottom: 18px;
+    }
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+    .form-label {
       display: block;
-      margin-bottom: 16px;
-    }
-    label .label-text {
       font-size: 13px;
       font-weight: 600;
       margin-bottom: 6px;
-      display: block;
+      color: #444;
     }
-    label .label-hint {
+    .form-hint {
       font-size: 11px;
       color: #999;
-      margin-top: 2px;
+      margin-top: 4px;
+      line-height: 1.4;
     }
-    input[type="text"], input[type="password"], input[type="number"], select, textarea {
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    input[type="number"],
+    select,
+    textarea {
       width: 100%;
-      padding: 8px 12px;
+      padding: 10px 14px;
       border: 1px solid #d9d9d9;
       border-radius: 8px;
       font-size: 14px;
       font-family: inherit;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      background: white;
+      color: #333;
     }
-    input:focus, select:focus, textarea:focus {
+    input:focus,
+    select:focus,
+    textarea:focus {
       outline: none;
       border-color: #00A6A7;
       box-shadow: 0 0 0 3px rgba(0,166,167,0.1);
     }
-    textarea { resize: vertical; min-height: 80px; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .btn-save {
+    input::placeholder,
+    textarea::placeholder {
+      color: #bbb;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 90px;
+      line-height: 1.5;
+    }
+    select {
+      cursor: pointer;
+      appearance: auto;
+    }
+
+    /* Buttons */
+    .btn-primary {
       background: #00A6A7;
       color: white;
       border: none;
       border-radius: 8px;
-      padding: 12px 32px;
+      padding: 12px 36px;
       font-size: 15px;
       font-weight: 600;
       cursor: pointer;
       transition: background 0.2s;
+      font-family: inherit;
     }
-    .btn-save:hover { background: #008f90; }
-    .btn-save:disabled { background: #ccc; cursor: not-allowed; }
-    .saved-msg {
-      display: inline-block;
-      margin-left: 12px;
-      color: #52c41a;
-      font-size: 14px;
-      opacity: 0;
-      transition: opacity 0.3s;
+    .btn-primary:hover {
+      background: #008f90;
     }
-    .saved-msg.show { opacity: 1; }
-    .btn-danger {
+    .btn-primary:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
       background: white;
-      color: #f5222d;
-      border: 1px solid #f5222d;
+      color: #00A6A7;
+      border: 1px solid #00A6A7;
       border-radius: 8px;
       padding: 8px 20px;
       font-size: 13px;
       cursor: pointer;
       transition: all 0.2s;
+      font-family: inherit;
     }
-    .btn-danger:hover { background: #f5222d; color: white; }
-    .api-test {
-      display: inline-block;
-      margin-left: 12px;
-      font-size: 12px;
-      padding: 4px 12px;
-      border: 1px solid #d9d9d9;
-      border-radius: 6px;
-      cursor: pointer;
+    .btn-secondary:hover {
+      background: #e6fffb;
+    }
+    .btn-secondary:disabled {
+      border-color: #ccc;
+      color: #ccc;
+      cursor: not-allowed;
+    }
+
+    .btn-danger {
       background: white;
+      color: #f5222d;
+      border: 1px solid #ffa39e;
+      border-radius: 8px;
+      padding: 8px 20px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
     }
-    .api-test:hover { border-color: #00A6A7; color: #00A6A7; }
+    .btn-danger:hover {
+      background: #f5222d;
+      color: white;
+      border-color: #f5222d;
+    }
+
+    /* API test area */
+    .api-test-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 4px;
+    }
     .api-status {
-      margin-left: 8px;
-      font-size: 12px;
+      font-size: 13px;
+      color: #999;
+    }
+
+    /* Data management buttons */
+    .data-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    /* Footer */
+    .footer-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 8px;
+    }
+
+    /* Toast message */
+    .toast {
+      display: inline-block;
+      font-size: 14px;
+      color: #52c41a;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .toast.show {
+      opacity: 1;
+    }
+    .toast.error {
+      color: #f5222d;
+    }
+
+    /* Description text */
+    .section-desc {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 16px;
+      line-height: 1.5;
     }
   </style>
 </head>
 <body>
-  <h1>🦐 开发岗位筛选助手 · 设置</h1>
+  <div class="page-title">
+    <span class="accent">开发岗位筛选助手</span>
+    <span>设置</span>
+  </div>
 
-  <!-- LLM API 配置 -->
+  <!-- AI 模型配置 -->
   <div class="section">
-    <h2>🤖 AI 模型配置</h2>
+    <div class="section-title">AI 模型配置</div>
 
-    <label>
-      <span class="label-text">API 提供商</span>
+    <div class="form-group">
+      <label class="form-label" for="llmProvider">API 服务商</label>
       <select id="llmProvider">
         <option value="openai">OpenAI</option>
         <option value="custom">自定义（OpenAI 兼容格式）</option>
       </select>
-    </label>
+    </div>
 
-    <label>
-      <span class="label-text">API Key</span>
+    <div class="form-group">
+      <label class="form-label" for="apiKey">API Key</label>
       <input type="password" id="apiKey" placeholder="sk-...">
-      <span class="label-hint">你的 API Key 只保存在本地浏览器，不会上传到任何服务器</span>
-    </label>
+      <div class="form-hint">你的 API Key 只保存在本地浏览器中，不会上传到任何服务器。</div>
+    </div>
 
-    <div class="row">
-      <label>
-        <span class="label-text">API 地址</span>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="apiBaseUrl">API Base URL</label>
         <input type="text" id="apiBaseUrl" placeholder="https://api.openai.com/v1">
-        <span class="label-hint">使用自定义提供商时修改此地址</span>
-      </label>
-      <label>
-        <span class="label-text">模型</span>
+        <div class="form-hint">使用自定义服务商时请修改此地址</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="model">模型名称</label>
         <input type="text" id="model" placeholder="gpt-4o">
-      </label>
+      </div>
     </div>
 
-    <div class="row">
-      <label>
-        <span class="label-text">单次最大 Token</span>
-        <input type="number" id="maxTokens" placeholder="2000">
-      </label>
-      <label>
-        <span class="label-text">每日请求上限</span>
-        <input type="number" id="dailyLimit" placeholder="200">
-      </label>
+    <div class="form-group">
+      <label class="form-label" for="maxTokens">单次最大 Token 数</label>
+      <input type="number" id="maxTokens" placeholder="2000" style="max-width: 200px;">
     </div>
 
-    <button class="api-test" id="testApiBtn">🧪 测试连接</button>
-    <span class="api-status" id="apiStatus"></span>
+    <div class="api-test-row">
+      <button class="btn-secondary" id="testApiBtn">测试 API 连接</button>
+      <span class="api-status" id="apiStatus"></span>
+    </div>
   </div>
 
   <!-- HR 信息 -->
   <div class="section">
-    <h2>👤 HR 信息</h2>
-    <div class="row">
-      <label>
-        <span class="label-text">HR 名称</span>
-        <input type="text" id="hrbpName" placeholder="HR小李">
-        <span class="label-hint">AI 沟通时使用的自称</span>
-      </label>
-      <label>
-        <span class="label-text">公司名称</span>
-        <input type="text" id="companyName" placeholder="XX科技">
-      </label>
+    <div class="section-title">HR 信息</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="hrbpName">HRBP 姓名</label>
+        <input type="text" id="hrbpName" placeholder="例：李老师">
+        <div class="form-hint">AI 沟通时的自称名称</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="companyName">公司名称</label>
+        <input type="text" id="companyName" placeholder="例：XX科技有限公司">
+      </div>
     </div>
   </div>
 
   <!-- 消息模板 -->
   <div class="section">
-    <h2>💬 消息模板</h2>
-    <label>
-      <span class="label-text">礼貌拒绝模板</span>
-      <textarea id="rejectTemplate" rows="3" placeholder="感谢您的关注！..."></textarea>
-      <span class="label-hint">不合格候选人自动发送的消息</span>
-    </label>
+    <div class="section-title">消息模板</div>
+
+    <div class="form-group">
+      <label class="form-label" for="rejectTemplate">不合格告知模板</label>
+      <textarea id="rejectTemplate" rows="3" placeholder="感谢您的关注！您的简历已收录到我们的人才数据库中..."></textarea>
+      <div class="form-hint">当候选人评估为不合格时，自动发送此消息。</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="scheduleTemplate">预约开场白模板</label>
+      <textarea id="scheduleTemplate" rows="4" placeholder="您好！我是{company}的{hrbpName}，关于{jobTitle}岗位，想和您做一个简单的电话沟通，以下时间段您方便吗？&#10;{timeSlots}"></textarea>
+      <div class="form-hint">
+        支持变量替换：{company} 公司名称、{hrbpName} HR姓名、{jobTitle} 职位名称、{timeSlots} 可选时间段。
+      </div>
+    </div>
+  </div>
+
+  <!-- 安全策略 -->
+  <div class="section">
+    <div class="section-title">安全策略</div>
+    <p class="section-desc">控制自动回复的频率和延迟，避免被平台检测为异常行为。</p>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="minDelay">最小回复延迟（秒）</label>
+        <input type="number" id="minDelay" placeholder="3" min="1">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="maxDelay">最大回复延迟（秒）</label>
+        <input type="number" id="maxDelay" placeholder="8" min="1">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="dailyLimit">每日消息上限</label>
+        <input type="number" id="dailyLimit" placeholder="200" min="1">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="timeoutHours">超时时间（小时）</label>
+        <input type="number" id="timeoutHours" placeholder="24" min="1">
+        <div class="form-hint">候选人超过此时间未回复则标记为超时</div>
+      </div>
+    </div>
   </div>
 
   <!-- 数据管理 -->
   <div class="section">
-    <h2>🗂️ 数据管理</h2>
-    <p style="font-size:13px; color:#666; margin-bottom:12px;">所有数据保存在本地浏览器中</p>
-    <button class="btn-danger" id="clearCandidates">清空候选人数据</button>
-    <button class="btn-danger" id="clearJobs" style="margin-left:8px;">清空职位 JD</button>
-    <button class="btn-danger" id="clearAll" style="margin-left:8px;">重置所有数据</button>
+    <div class="section-title">数据管理</div>
+    <p class="section-desc">所有数据仅保存在本地浏览器中。清空操作不可撤销，请谨慎操作。</p>
+    <div class="data-buttons">
+      <button class="btn-danger" id="clearCandidates">清空候选人数据</button>
+      <button class="btn-danger" id="clearJobs">清空职位数据</button>
+      <button class="btn-danger" id="clearAll">清空所有数据</button>
+    </div>
   </div>
 
-  <div style="margin-top:16px;">
-    <button class="btn-save" id="saveBtn">💾 保存设置</button>
-    <span class="saved-msg" id="savedMsg">✅ 已保存</span>
+  <!-- Save -->
+  <div class="footer-actions">
+    <button class="btn-primary" id="saveBtn">保存设置</button>
+    <span class="toast" id="toastMsg"></span>
   </div>
 
   <script src="options.js"></script>

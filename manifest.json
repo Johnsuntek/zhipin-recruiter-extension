@@ -1,16 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "开发岗位简历筛选助手",
-  "description": "辅助 HRBP 在 BOSS直聘 上高效筛选开发岗位候选人，AI 自动评估简历匹配度。",
-  "version": "0.3.0",
+  "name": "BOSS直聘开发岗位筛选助手",
+  "description": "AI 自动评估开发岗位候选人简历匹配度，自动预约电话沟通，自动礼貌告知不合格候选人。",
+  "version": "1.0.0",
   "permissions": [
     "storage",
     "tabs",
-    "activeTab"
+    "activeTab",
+    "alarms"
   ],
   "host_permissions": [
     "https://*.zhipin.com/*",
-    "https://api.openai.com/*",
     "https://*/*"
   ],
   "background": {
@@ -22,24 +22,25 @@
   },
   "content_scripts": [
     {
+      "matches": ["https://*.zhipin.com/web/boss/chat/*"],
+      "js": ["content/chatAutomation.js"],
+      "run_at": "document_idle"
+    },
+    {
       "matches": [
         "https://*.zhipin.com/web/chat/*",
         "https://*.zhipin.com/web/boss/*"
       ],
       "js": [
         "content/candidateScanner.js",
-        "content/aiEvaluator.js",
         "content/panel.js"
       ],
+      "css": [],
       "run_at": "document_idle"
     },
     {
-      "matches": [
-        "https://*.zhipin.com/web/chat/job/*"
-      ],
-      "js": [
-        "content/jobSaver.js"
-      ],
+      "matches": ["https://*.zhipin.com/web/chat/job/*"],
+      "js": ["content/jobScanner.js"],
       "run_at": "document_idle"
     }
   ],
