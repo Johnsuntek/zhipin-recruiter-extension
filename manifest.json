@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Zhipin HR Resume Helper",
+  "description": "辅助 HRBP 在 zhipin.com 上进行候选人筛选、打标和约面记录的浏览器插件（本地存储版）。",
+  "version": "0.1.0",
+  "permissions": [
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://*.zhipin.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Zhipin HR Helper"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.zhipin.com/*"
+      ],
+      "js": [
+        "content/jobScanner.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options.html"
+}

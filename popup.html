@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Zhipin HR Helper</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 0;
+        padding: 8px;
+        width: 420px;
+        box-sizing: border-box;
+      }
+      h1 {
+        font-size: 16px;
+        margin: 0 0 8px;
+      }
+      .filters {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      select {
+        font-size: 12px;
+      }
+      .candidate-list {
+        max-height: 400px;
+        overflow-y: auto;
+        border-top: 1px solid #eee;
+        margin-top: 4px;
+        padding-top: 4px;
+      }
+      .candidate-item {
+        border-bottom: 1px solid #f0f0f0;
+        padding: 4px 0;
+      }
+      .candidate-header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+      }
+      .candidate-meta {
+        font-size: 11px;
+        color: #666;
+      }
+      .badge {
+        display: inline-block;
+        padding: 1px 4px;
+        border-radius: 4px;
+        font-size: 10px;
+        margin-left: 4px;
+      }
+      .badge-qualified {
+        background-color: #e6f7ff;
+        color: #1890ff;
+      }
+      .badge-unqualified {
+        background-color: #fff1f0;
+        color: #f5222d;
+      }
+      .badge-pending {
+        background-color: #fffbe6;
+        color: #faad14;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>候选人总览</h1>
+    <div class="filters">
+      <label>
+        状态：
+        <select id="statusFilter">
+          <option value="all">全部</option>
+          <option value="qualified">合格</option>
+          <option value="unqualified">不合格</option>
+          <option value="pending">待定/待评估</option>
+        </select>
+      </label>
+    </div>
+    <div class="candidate-list" id="candidateList"></div>
+    <script src="popup.js"></script>
+  </body>
+</html>
+
