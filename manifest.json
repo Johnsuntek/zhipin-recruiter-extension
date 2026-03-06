@@ -1,33 +1,58 @@
 {
   "manifest_version": 3,
-  "name": "Zhipin HR Resume Helper",
-  "description": "辅助 HRBP 在 zhipin.com 上进行候选人筛选、打标和约面记录的浏览器插件（本地存储版）。",
-  "version": "0.1.0",
+  "name": "开发岗位简历筛选助手",
+  "description": "辅助 HRBP 在 BOSS直聘 上高效筛选开发岗位候选人，AI 自动评估简历匹配度。",
+  "version": "0.3.0",
   "permissions": [
     "storage",
-    "tabs"
+    "tabs",
+    "activeTab"
   ],
   "host_permissions": [
-    "https://*.zhipin.com/*"
+    "https://*.zhipin.com/*",
+    "https://api.openai.com/*",
+    "https://*/*"
   ],
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "service_worker": "background.js"
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Zhipin HR Helper"
+    "default_title": "开发岗位筛选助手"
   },
   "content_scripts": [
     {
       "matches": [
-        "https://*.zhipin.com/*"
+        "https://*.zhipin.com/web/chat/*",
+        "https://*.zhipin.com/web/boss/*"
       ],
       "js": [
-        "content/jobScanner.js"
+        "content/candidateScanner.js",
+        "content/aiEvaluator.js",
+        "content/panel.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.zhipin.com/web/chat/job/*"
+      ],
+      "js": [
+        "content/jobSaver.js"
       ],
       "run_at": "document_idle"
     }
   ],
-  "options_page": "options.html"
+  "web_accessible_resources": [
+    {
+      "resources": ["content/panel.css"],
+      "matches": ["https://*.zhipin.com/*"]
+    }
+  ],
+  "options_page": "options.html",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }

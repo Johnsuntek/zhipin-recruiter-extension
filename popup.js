@@ -1,85 +1,69 @@
-function statusLabel(status) {
-  if (status === "qualified") return "合格";
-  if (status === "unqualified") return "不合格";
-  if (status === "pending") return "待定";
-  return status || "未知";
-}
-
-function statusBadgeClass(status) {
-  if (status === "qualified") return "badge badge-qualified";
-  if (status === "unqualified") return "badge badge-unqualified";
-  return "badge badge-pending";
-}
-
-function renderCandidates(data, filterStatus) {
-  const listEl = document.getElementById("candidateList");
-  listEl.innerHTML = "";
-  const candidates = data.candidates || {};
-  const jobs = data.jobs || {};
-
-  const items = Object.values(candidates)
-    .filter((c) => {
-      if (filterStatus === "all") return true;
-      return c.status === filterStatus;
-    })
-    .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
-
-  if (!items.length) {
-    listEl.textContent = "暂无候选人数据。请在 zhipin.com 上浏览候选人列表并进行打标。";
-    return;
-  }
-
-  items.forEach((c) => {
-    const itemEl = document.createElement("div");
-    itemEl.className = "candidate-item";
-
-    const header = document.createElement("div");
-    header.className = "candidate-header";
-    const left = document.createElement("div");
-    left.textContent = c.name || "未命名候选人";
-    const right = document.createElement("div");
-    const badge = document.createElement("span");
-    badge.className = statusBadgeClass(c.status);
-    badge.textContent = statusLabel(c.status);
-    right.appendChild(badge);
-    header.appendChild(left);
-    header.appendChild(right);
-
-    const meta = document.createElement("div");
-    meta.className = "candidate-meta";
-    const jobTitles =
-      (c.jobIds || [])
-        .map((id) => (jobs[id] ? jobs[id].jobTitle : ""))
-        .filter(Boolean)
-        .join(" / ") || "关联职位：-";
-    meta.textContent = [
-      c.currentTitle || "",
-      c.yearsExp || "",
-      c.expectedSalary || "",
-      c.city || "",
-      jobTitles
-    ]
-      .filter(Boolean)
-      .join(" ｜ ");
-
-    itemEl.appendChild(header);
-    itemEl.appendChild(meta);
-    listEl.appendChild(itemEl);
-  });
-}
+// popup.js — 扩展弹窗逻辑
 
 function loadData() {
-  chrome.runtime.sendMessage({ type: "GET_ALL_DATA" }, (res) => {
+  chrome.runtime.sendMessage({ type: 'GET_ALL_DATA' }, (res) => {
     if (!res || !res.ok) return;
-    const select = document.getElementById("statusFilter");
-    const filterStatus = select.value;
-    renderCandidates(res.data, filterStatus);
+
+    const { jobs, candidates } = res.data;
+
+    // 统计
+    const allCandidates = Object.values(candidates || {});
+    const qualified = allCandidates.filter(c => c.status === 'qualified');
+    const pending = allCandidates.filter(c => c.status === 'pending');
+    const unqualified = allCandidates.filter(c => c.status === 'unqualified');
+
+    document.getElementById('statTotal').textContent = allCandidates.length;
+    document.getElementById('statQualified').textContent = qualified.length;
+    document.getElementById('statPending').textContent = pending.length;
+    document.getElementById('statUnqualified').textContent = unqualified.length;
+
+    // 已保存职位
+    const jobList = Object.values(jobs || {});
+    const jobContent = document.getElementById('jobListContent');
+
+    if (jobList.length === 0) {
+      jobContent.innerHTML = '<div class="empty">暂无已保存的职位<br>请在 BOSS 直聘职位管理页面保存</div>';
+    } else {
+      jobContent.innerHTML = jobList.map(j => `
+        <div class="job-item">
+          <span class="name">${j.title || '未命名'}</span>
+          <span class="badge">${j.dimensions ? '✅ 已分析' : '📥 已保存'}</span>
+        </div>
+      `).join('');
+      jobContent.classList.remove('empty');
+    }
+
+    // 最近评估
+    const recent = allCandidates
+      .filter(c => c.score !== undefined && c.score !== null)
+      .sort((a, b) => (b.evaluatedAt || '').localeCompare(a.evaluatedAt || ''))
+      .slice(0, 5);
+
+    if (recent.length > 0) {
+      document.getElementById('recentSection').style.display = 'block';
+      document.getElementById('recentList').innerHTML = recent.map(c => {
+        const colorClass = c.score >= 80 ? 'green' : c.score >= 60 ? 'orange' : 'red';
+        return `
+          <div class="recent-item">
+            <span>${c.name || '未知'} · ${c.job || ''}</span>
+            <span class="score ${colorClass}">${c.score}分</span>
+          </div>
+        `;
+      }).join('');
+    }
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  const select = document.getElementById("statusFilter");
-  select.addEventListener("change", loadData);
+document.addEventListener('DOMContentLoaded', () => {
   loadData();
-});
 
+  // 设置按钮
+  document.getElementById('settingsBtn').addEventListener('click', () => {
+    chrome.runtime.openOptionsPage();
+  });
+
+  // 打开 BOSS 直聘
+  document.getElementById('openBossBtn').addEventListener('click', () => {
+    chrome.tabs.create({ url: 'https://www.zhipin.com/web/chat/index' });
+  });
+});
