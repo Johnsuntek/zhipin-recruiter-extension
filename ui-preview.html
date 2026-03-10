@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>UI Preview — 开发岗位筛选助手</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #e8e8e8;
+      padding: 40px;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 40px;
+      font-size: 28px;
+      color: #1a1a1a;
+    }
+    .preview-row {
+      display: flex;
+      gap: 40px;
+      justify-content: center;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      margin-bottom: 60px;
+    }
+    .preview-label {
+      text-align: center;
+      font-size: 16px;
+      font-weight: 600;
+      color: #666;
+      margin-bottom: 12px;
+    }
+    .preview-box {
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    }
+
+    /* ==================== POPUP ==================== */
+    .popup-frame {
+      width: 400px;
+      background: #f7f8fa;
+    }
+    .popup-header {
+      background: linear-gradient(135deg, #00A6A7, #00878a);
+      color: white;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .popup-header .title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+    .popup-header .version {
+      font-size: 11px; opacity: 0.7; margin-left: auto;
+      background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 10px;
+    }
+
+    .popup-stats {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 0;
+      background: white; border-bottom: 1px solid #eee;
+    }
+    .popup-stat { text-align: center; padding: 14px 4px 12px; position: relative; }
+    .popup-stat:not(:last-child)::after {
+      content: ''; position: absolute; right: 0; top: 20%; height: 60%; width: 1px; background: #f0f0f0;
+    }
+    .popup-stat .num { font-size: 22px; font-weight: 700; line-height: 1.2; }
+    .popup-stat .lbl { font-size: 11px; color: #999; margin-top: 4px; }
+
+    .popup-content { padding: 12px 16px 16px; }
+    .popup-card {
+      background: white; border-radius: 10px; padding: 14px 16px; margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .card-title {
+      font-size: 13px; font-weight: 600; color: #666; margin-bottom: 10px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .card-title .count { font-size: 11px; color: #999; font-weight: 400; }
+
+    .schedule-item {
+      display: flex; align-items: center; padding: 8px 0;
+      border-bottom: 1px solid #f5f5f5; font-size: 13px;
+    }
+    .schedule-item:last-child { border-bottom: none; }
+    .schedule-info { flex: 1; min-width: 0; }
+    .schedule-name { font-weight: 600; color: #333; }
+    .schedule-job { font-size: 11px; color: #999; margin-top: 2px; }
+    .schedule-time { text-align: right; flex-shrink: 0; margin-left: 12px; }
+    .schedule-time .time { font-size: 12px; color: #1677ff; font-weight: 500; }
+    .schedule-time .countdown { font-size: 10px; color: #999; margin-top: 2px; }
+
+    .job-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 7px 0; border-bottom: 1px solid #f5f5f5; font-size: 13px;
+    }
+    .job-item:last-child { border-bottom: none; }
+    .job-name { font-weight: 500; color: #333; flex: 1; margin-right: 10px; }
+    .job-badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 10px;
+      background: #e6fffb; color: #00A6A7; flex-shrink: 0;
+    }
+
+    .eval-item {
+      display: flex; align-items: center; padding: 6px 0;
+      border-bottom: 1px solid #f8f8f8; font-size: 12px;
+    }
+    .eval-item:last-child { border-bottom: none; }
+    .eval-info { flex: 1; min-width: 0; color: #555; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .eval-score { font-weight: 700; margin-left: 10px; flex-shrink: 0; }
+    .eval-status {
+      font-size: 11px; padding: 1px 6px; border-radius: 8px; margin-left: 8px; flex-shrink: 0;
+    }
+
+    .popup-footer {
+      padding: 0 16px 16px; display: flex; gap: 10px;
+    }
+    .popup-footer button {
+      flex: 1; padding: 10px 8px; border: 1px solid #d9d9d9; border-radius: 8px;
+      background: white; font-size: 13px; cursor: pointer; font-family: inherit;
+    }
+    .popup-footer .primary {
+      background: #00A6A7; color: white; border-color: #00A6A7; font-weight: 600;
+    }
+
+    /* ==================== SIDE PANEL ==================== */
+    .panel-frame {
+      width: 360px;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      max-height: 720px;
+      overflow: hidden;
+    }
+    .sp-header {
+      background: linear-gradient(135deg, #00A6A7, #008a8c);
+      color: white; padding: 16px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .sp-header .title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+    .sp-header .status { font-size: 11px; opacity: 0.8; margin-top: 2px; }
+    .sp-header .close-btn {
+      background: rgba(255,255,255,0.2); border: none; color: white;
+      width: 28px; height: 28px; border-radius: 6px; font-size: 14px;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+    }
+
+    .sp-stats {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
+      padding: 10px 12px; background: #fafafa; border-bottom: 1px solid #f0f0f0;
+    }
+    .sp-stat {
+      text-align: center; padding: 6px 2px; border-radius: 8px;
+      background: white; border: 1px solid #f0f0f0;
+    }
+    .sp-stat .number { font-size: 20px; font-weight: 700; line-height: 1.2; }
+    .sp-stat .label { font-size: 10px; color: #999; margin-top: 1px; }
+
+    .sp-controls {
+      padding: 10px 14px; border-bottom: 1px solid #f0f0f0;
+    }
+    .sp-controls select {
+      width: 100%; padding: 6px 8px; border: 1px solid #d9d9d9; border-radius: 6px;
+      font-size: 12px; background: white; color: #333; margin-bottom: 8px;
+    }
+    .auto-screen-btn {
+      width: 100%; padding: 10px; border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 600; cursor: pointer; color: white;
+      background: linear-gradient(135deg, #52c41a, #389e0d);
+    }
+    .progress-bar {
+      margin-top: 8px; height: 6px; background: #f0f0f0; border-radius: 3px; overflow: hidden;
+    }
+    .progress-bar .fill {
+      height: 100%; width: 65%; background: linear-gradient(90deg, #52c41a, #00A6A7); border-radius: 3px;
+    }
+    .progress-text { font-size: 11px; color: #999; margin-top: 4px; }
+
+    .sp-tabs {
+      display: flex; padding: 0 14px; border-bottom: 1px solid #f0f0f0;
+    }
+    .sp-tab {
+      padding: 9px 10px; font-size: 12px; color: #666; cursor: pointer;
+      border-bottom: 2px solid transparent; white-space: nowrap;
+    }
+    .sp-tab.active { color: #00A6A7; border-bottom-color: #00A6A7; font-weight: 600; }
+
+    .sp-list { padding: 8px 14px; flex: 1; overflow-y: auto; }
+
+    .candidate-card {
+      background: white; border: 1px solid #f0f0f0; border-radius: 10px;
+      padding: 12px; margin-bottom: 8px;
+    }
+    .cc-header {
+      display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;
+    }
+    .cc-name { font-size: 14px; font-weight: 600; color: #333; }
+    .cc-job-tag {
+      display: inline-block; font-size: 11px; color: #00A6A7; background: #e6fffb;
+      padding: 1px 6px; border-radius: 4px; margin-left: 6px; vertical-align: middle;
+    }
+    .status-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 600; white-space: nowrap;
+    }
+    .status-badge.qualified { background: #f6ffed; color: #52c41a; }
+    .status-badge.pending { background: #fffbe6; color: #faad14; }
+    .status-badge.unqualified { background: #fff2f0; color: #f5222d; }
+    .status-badge.scheduling { background: #e6f7ff; color: #1890ff; }
+
+    .score-bar-mini {
+      height: 6px; background: #f0f0f0; border-radius: 3px; margin: 8px 0 4px; overflow: hidden;
+    }
+    .score-bar-mini .fill { height: 100%; border-radius: 3px; }
+    .score-bar-mini .fill.green { background: linear-gradient(90deg, #52c41a, #95de64); }
+    .score-bar-mini .fill.orange { background: linear-gradient(90deg, #faad14, #ffc53d); }
+    .score-bar-mini .fill.red { background: linear-gradient(90deg, #f5222d, #ff7875); }
+
+    .score-meta {
+      display: flex; justify-content: space-between; font-size: 11px; color: #999; margin-bottom: 4px;
+    }
+    .eval-summary-text { font-size: 12px; color: #666; margin: 6px 0; line-height: 1.6; }
+
+    .card-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .btn-action {
+      padding: 5px 10px; border: 1px solid #d9d9d9; border-radius: 6px;
+      background: white; font-size: 12px; cursor: pointer;
+    }
+    .btn-evaluate { border-color: #00A6A7; color: #00A6A7; }
+    .btn-schedule { border-color: #1890ff; color: #1890ff; }
+    .btn-reject { border-color: #f5222d; color: #f5222d; }
+    .btn-detail { border-color: #d9d9d9; color: #666; }
+
+    .sp-footer {
+      padding: 10px 14px; border-top: 1px solid #f0f0f0;
+      display: flex; justify-content: space-between; align-items: center; background: #fafafa;
+    }
+    .sp-footer button {
+      padding: 5px 12px; border: 1px solid #d9d9d9; border-radius: 6px;
+      background: white; font-size: 12px; cursor: pointer; color: #666;
+    }
+    .sp-footer .version { font-size: 11px; color: #ccc; }
+
+    /* ==================== OPTIONS PAGE ==================== */
+    .options-frame {
+      width: 700px;
+      background: #f5f6f8;
+      padding: 32px 20px;
+      border-radius: 12px;
+    }
+    .opt-page-title {
+      font-size: 22px; font-weight: 700; margin-bottom: 28px; color: #1a1a1a;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .opt-page-title .accent { color: #00A6A7; }
+
+    .opt-section {
+      background: white; border-radius: 12px; padding: 24px; margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .opt-section-title {
+      font-size: 16px; font-weight: 600; margin-bottom: 20px;
+      padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; color: #333;
+    }
+    .opt-form-group { margin-bottom: 18px; }
+    .opt-form-group:last-child { margin-bottom: 0; }
+    .opt-form-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #444; }
+    .opt-form-hint { font-size: 11px; color: #999; margin-top: 4px; line-height: 1.4; }
+    .opt-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    .opt-input, .opt-select, .opt-textarea {
+      width: 100%; padding: 10px 14px; border: 1px solid #d9d9d9; border-radius: 8px;
+      font-size: 14px; font-family: inherit; background: white; color: #333;
+    }
+    .opt-textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+
+    .opt-btn-primary {
+      background: #00A6A7; color: white; border: none; border-radius: 8px;
+      padding: 12px 36px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit;
+    }
+    .opt-btn-secondary {
+      background: white; color: #00A6A7; border: 1px solid #00A6A7; border-radius: 8px;
+      padding: 8px 20px; font-size: 13px; cursor: pointer; font-family: inherit;
+    }
+    .opt-btn-danger {
+      background: white; color: #f5222d; border: 1px solid #ffa39e; border-radius: 8px;
+      padding: 8px 20px; font-size: 13px; cursor: pointer; font-family: inherit;
+    }
+    .opt-data-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
+    .opt-section-desc { font-size: 13px; color: #888; margin-bottom: 16px; line-height: 1.5; }
+    .opt-api-test-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+    .opt-api-status { font-size: 13px; color: #52c41a; }
+    .opt-footer { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
+
+    /* ==================== TRIGGER BUTTON ==================== */
+    .trigger-demo {
+      position: relative;
+      width: 60px;
+      height: 200px;
+    }
+    .trigger-btn-demo {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      background: #00A6A7;
+      color: white;
+      border: none;
+      border-radius: 8px 0 0 8px;
+      padding: 14px 8px;
+      cursor: pointer;
+      writing-mode: vertical-lr;
+      font-size: 14px;
+      font-weight: 600;
+      box-shadow: -2px 0 10px rgba(0,0,0,0.15);
+      letter-spacing: 3px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>开发岗位筛选助手 — UI 界面预览</h1>
+
+<!-- Row 1: Popup + Side Panel -->
+<div class="preview-row">
+
+  <!-- Popup -->
+  <div>
+    <div class="preview-label">Popup 弹窗</div>
+    <div class="preview-box popup-frame">
+      <div class="popup-header">
+        <span class="title">开发岗位筛选助手</span>
+        <span class="version">v1.0.0</span>
+      </div>
+      <div class="popup-stats">
+        <div class="popup-stat">
+          <div class="num" style="color:#333;">12</div>
+          <div class="lbl">总计</div>
+        </div>
+        <div class="popup-stat">
+          <div class="num" style="color:#52c41a;">5</div>
+          <div class="lbl">合格</div>
+        </div>
+        <div class="popup-stat">
+          <div class="num" style="color:#faad14;">3</div>
+          <div class="lbl">待定</div>
+        </div>
+        <div class="popup-stat">
+          <div class="num" style="color:#f5222d;">2</div>
+          <div class="lbl">不合格</div>
+        </div>
+        <div class="popup-stat">
+          <div class="num" style="color:#1677ff;">2</div>
+          <div class="lbl">已预约</div>
+        </div>
+      </div>
+      <div class="popup-content">
+        <!-- Schedule card -->
+        <div class="popup-card">
+          <div class="card-title"><span>即将到来的电话沟通</span><span class="count">(2)</span></div>
+          <div class="schedule-item">
+            <div class="schedule-info">
+              <div class="schedule-name">张三</div>
+              <div class="schedule-job">高级前端工程师</div>
+            </div>
+            <div class="schedule-time">
+              <div class="time">今天 14:00</div>
+              <div class="countdown">2小时后</div>
+            </div>
+          </div>
+          <div class="schedule-item">
+            <div class="schedule-info">
+              <div class="schedule-name">李四</div>
+              <div class="schedule-job">Java后端开发</div>
+            </div>
+            <div class="schedule-time">
+              <div class="time">明天 10:00</div>
+              <div class="countdown">20小时后</div>
+            </div>
+          </div>
+        </div>
+        <!-- Jobs card -->
+        <div class="popup-card">
+          <div class="card-title"><span>已保存的职位</span><span class="count">(3)</span></div>
+          <div class="job-item">
+            <span class="job-name">高级前端工程师</span>
+            <span class="job-badge">5 人</span>
+          </div>
+          <div class="job-item">
+            <span class="job-name">Java后端开发</span>
+            <span class="job-badge">4 人</span>
+          </div>
+          <div class="job-item">
+            <span class="job-name">全栈工程师</span>
+            <span class="job-badge">3 人</span>
+          </div>
+        </div>
+        <!-- Recent evaluations -->
+        <div class="popup-card">
+          <div class="card-title"><span>最近评估</span></div>
+          <div class="eval-item">
+            <span class="eval-info">王五 · 高级前端工程师</span>
+            <span class="eval-score" style="color:#52c41a;">85</span>
+            <span class="eval-status" style="background:#f6ffed;color:#52c41a;">合格</span>
+          </div>
+          <div class="eval-item">
+            <span class="eval-info">赵六 · Java后端开发</span>
+            <span class="eval-score" style="color:#faad14;">62</span>
+            <span class="eval-status" style="background:#fff7e6;color:#faad14;">待定</span>
+          </div>
+          <div class="eval-item">
+            <span class="eval-info">孙七 · 全栈工程师</span>
+            <span class="eval-score" style="color:#f5222d;">38</span>
+            <span class="eval-status" style="background:#fff1f0;color:#f5222d;">不合格</span>
+          </div>
+        </div>
+      </div>
+      <div class="popup-footer">
+        <button>设置</button>
+        <button class="primary">打开 BOSS 直聘</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trigger button demo -->
+  <div>
+    <div class="preview-label">触发按钮</div>
+    <div class="preview-box" style="background:#f0f0f0; width:80px; height:200px; position:relative; border-radius:8px;">
+      <button class="trigger-btn-demo">筛选助手</button>
+    </div>
+  </div>
+
+  <!-- Side Panel -->
+  <div>
+    <div class="preview-label">侧边面板 (Side Panel)</div>
+    <div class="preview-box panel-frame">
+      <div class="sp-header">
+        <div>
+          <div class="title">筛选助手</div>
+          <div class="status">当前职位: 高级前端工程师</div>
+        </div>
+        <button class="close-btn">✕</button>
+      </div>
+      <div class="sp-stats">
+        <div class="sp-stat"><div class="number" style="color:#1677ff;">12</div><div class="label">总计</div></div>
+        <div class="sp-stat"><div class="number" style="color:#52c41a;">5</div><div class="label">合格</div></div>
+        <div class="sp-stat"><div class="number" style="color:#faad14;">3</div><div class="label">待定</div></div>
+        <div class="sp-stat"><div class="number" style="color:#f5222d;">2</div><div class="label">不合格</div></div>
+        <div class="sp-stat"><div class="number" style="color:#1890ff;">2</div><div class="label">预约中</div></div>
+      </div>
+      <div class="sp-controls">
+        <select><option>高级前端工程师</option></select>
+        <button class="auto-screen-btn">▶ 开始自动筛选</button>
+        <div class="progress-bar"><div class="fill"></div></div>
+        <div class="progress-text">正在评估: 王五 (3/12)</div>
+      </div>
+      <div class="sp-tabs">
+        <div class="sp-tab active">全部</div>
+        <div class="sp-tab">合格</div>
+        <div class="sp-tab">不合格</div>
+        <div class="sp-tab">预约中</div>
+        <div class="sp-tab">已预约</div>
+      </div>
+      <div class="sp-list">
+        <!-- Card 1: Qualified -->
+        <div class="candidate-card">
+          <div class="cc-header">
+            <div><span class="cc-name">张三</span><span class="cc-job-tag">高级前端</span></div>
+            <span class="status-badge qualified">合格</span>
+          </div>
+          <div class="score-bar-mini"><div class="fill green" style="width:85%;"></div></div>
+          <div class="score-meta"><span>AI 评分</span><span style="color:#52c41a;font-weight:600;">85 分</span></div>
+          <div class="eval-summary-text">5年 React/Vue 经验，熟悉 TypeScript，有大型项目架构经验，技术栈匹配度高...</div>
+          <div class="card-actions">
+            <button class="btn-action btn-schedule">预约沟通</button>
+            <button class="btn-action btn-detail">详情</button>
+          </div>
+        </div>
+        <!-- Card 2: Pending -->
+        <div class="candidate-card">
+          <div class="cc-header">
+            <div><span class="cc-name">赵六</span><span class="cc-job-tag">Java后端</span></div>
+            <span class="status-badge pending">待定</span>
+          </div>
+          <div class="score-bar-mini"><div class="fill orange" style="width:62%;"></div></div>
+          <div class="score-meta"><span>AI 评分</span><span style="color:#faad14;font-weight:600;">62 分</span></div>
+          <div class="eval-summary-text">3年 Java 开发经验，Spring Boot 熟练，但缺少微服务和分布式系统经验...</div>
+          <div class="card-actions">
+            <button class="btn-action btn-evaluate">重新评估</button>
+            <button class="btn-action btn-schedule">预约沟通</button>
+            <button class="btn-action btn-detail">详情</button>
+          </div>
+        </div>
+        <!-- Card 3: Unqualified -->
+        <div class="candidate-card">
+          <div class="cc-header">
+            <div><span class="cc-name">孙七</span><span class="cc-job-tag">全栈</span></div>
+            <span class="status-badge unqualified">不合格</span>
+          </div>
+          <div class="score-bar-mini"><div class="fill red" style="width:38%;"></div></div>
+          <div class="score-meta"><span>AI 评分</span><span style="color:#f5222d;font-weight:600;">38 分</span></div>
+          <div class="eval-summary-text">经验不足1年，技术栈不匹配，无相关项目经验...</div>
+          <div class="card-actions">
+            <button class="btn-action btn-reject">拒绝告知</button>
+            <button class="btn-action btn-detail">详情</button>
+          </div>
+        </div>
+      </div>
+      <div class="sp-footer">
+        <div style="display:flex;gap:8px;">
+          <button>导出报告</button>
+          <button>刷新</button>
+        </div>
+        <span class="version">v1.0.0</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Row 2: Options Page -->
+<div class="preview-row">
+  <div>
+    <div class="preview-label">设置页 (Options Page)</div>
+    <div class="preview-box options-frame">
+      <div class="opt-page-title">
+        <span class="accent">开发岗位筛选助手</span>
+        <span>设置</span>
+      </div>
+
+      <!-- AI config -->
+      <div class="opt-section">
+        <div class="opt-section-title">AI 模型配置</div>
+        <div class="opt-form-group">
+          <label class="opt-form-label">API 服务商</label>
+          <select class="opt-select"><option>OpenAI</option><option>自定义（OpenAI 兼容格式）</option></select>
+        </div>
+        <div class="opt-form-group">
+          <label class="opt-form-label">API Key</label>
+          <input class="opt-input" type="password" value="sk-xxxxxxxxxxxxxxxx" style="letter-spacing:2px;">
+          <div class="opt-form-hint">你的 API Key 只保存在本地浏览器中，不会上传到任何服务器。</div>
+        </div>
+        <div class="opt-form-row">
+          <div class="opt-form-group">
+            <label class="opt-form-label">API Base URL</label>
+            <input class="opt-input" type="text" value="https://api.openai.com/v1">
+            <div class="opt-form-hint">使用自定义服务商时请修改此地址</div>
+          </div>
+          <div class="opt-form-group">
+            <label class="opt-form-label">模型名称</label>
+            <input class="opt-input" type="text" value="gpt-4o">
+          </div>
+        </div>
+        <div class="opt-form-group">
+          <label class="opt-form-label">单次最大 Token 数</label>
+          <input class="opt-input" type="number" value="2000" style="max-width:200px;">
+        </div>
+        <div class="opt-api-test-row">
+          <button class="opt-btn-secondary">测试 API 连接</button>
+          <span class="opt-api-status">✓ 连接成功</span>
+        </div>
+      </div>
+
+      <!-- HR Info -->
+      <div class="opt-section">
+        <div class="opt-section-title">HR 信息</div>
+        <div class="opt-form-row">
+          <div class="opt-form-group">
+            <label class="opt-form-label">HRBP 姓名</label>
+            <input class="opt-input" type="text" value="李老师">
+            <div class="opt-form-hint">AI 沟通时的自称名称</div>
+          </div>
+          <div class="opt-form-group">
+            <label class="opt-form-label">公司名称</label>
+            <input class="opt-input" type="text" value="XX科技有限公司">
+          </div>
+        </div>
+      </div>
+
+      <!-- Message templates -->
+      <div class="opt-section">
+        <div class="opt-section-title">消息模板</div>
+        <div class="opt-form-group">
+          <label class="opt-form-label">不合格告知模板</label>
+          <textarea class="opt-textarea" rows="2">感谢您的关注！您的简历已收录到我们的人才数据库中，后续如有合适的岗位会第一时间联系您。祝您求职顺利！</textarea>
+          <div class="opt-form-hint">当候选人评估为不合格时，自动发送此消息。</div>
+        </div>
+        <div class="opt-form-group">
+          <label class="opt-form-label">预约开场白模板</label>
+          <textarea class="opt-textarea" rows="3">您好！我是{company}的{hrbpName}，关于{jobTitle}岗位，想和您做一个简单的电话沟通，以下时间段您方便吗？
+{timeSlots}</textarea>
+          <div class="opt-form-hint">支持变量替换：{company} 公司名称、{hrbpName} HR姓名、{jobTitle} 职位名称、{timeSlots} 可选时间段。</div>
+        </div>
+      </div>
+
+      <!-- Security -->
+      <div class="opt-section">
+        <div class="opt-section-title">安全策略</div>
+        <p class="opt-section-desc">控制自动回复的频率和延迟，避免被平台检测为异常行为。</p>
+        <div class="opt-form-row">
+          <div class="opt-form-group">
+            <label class="opt-form-label">最小回复延迟（秒）</label>
+            <input class="opt-input" type="number" value="3">
+          </div>
+          <div class="opt-form-group">
+            <label class="opt-form-label">最大回复延迟（秒）</label>
+            <input class="opt-input" type="number" value="8">
+          </div>
+        </div>
+        <div class="opt-form-row" style="margin-top:18px;">
+          <div class="opt-form-group">
+            <label class="opt-form-label">每日消息上限</label>
+            <input class="opt-input" type="number" value="200">
+          </div>
+          <div class="opt-form-group">
+            <label class="opt-form-label">超时时间（小时）</label>
+            <input class="opt-input" type="number" value="24">
+            <div class="opt-form-hint">候选人超过此时间未回复则标记为超时</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Data management -->
+      <div class="opt-section">
+        <div class="opt-section-title">数据管理</div>
+        <p class="opt-section-desc">所有数据仅保存在本地浏览器中。清空操作不可撤销，请谨慎操作。</p>
+        <div class="opt-data-buttons">
+          <button class="opt-btn-danger">清空候选人数据</button>
+          <button class="opt-btn-danger">清空职位数据</button>
+          <button class="opt-btn-danger">清空所有数据</button>
+        </div>
+      </div>
+
+      <div class="opt-footer">
+        <button class="opt-btn-primary">保存设置</button>
+        <span style="font-size:14px;color:#52c41a;">✓ 保存成功</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
